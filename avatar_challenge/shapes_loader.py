@@ -1,13 +1,15 @@
 import rclpy
 import numpy as np
 import copy
-from rclpy.node import Node
-from tf_transformations import quaternion_from_euler, quaternion_matrix
-import yaml
-from pymoveit2 import MoveIt2
 import os
-from ament_index_python.packages import get_package_share_directory
+import yaml
+
+from rclpy.node import Node
 from geometry_msgs.msg import Pose
+from tf_transformations import quaternion_from_euler, quaternion_matrix
+from ament_index_python.packages import get_package_share_directory
+from pymoveit2 import MoveIt2
+
 
 class ShapesLoader(Node):
 
@@ -15,7 +17,10 @@ class ShapesLoader(Node):
 
         super().__init__('shape_loader')
 
-        self.movit2 = self.moveit2 = MoveIt2(
+        self.log("Shape Loader node started")
+
+        # MoveIt2 interface
+        self.moveit2 = MoveIt2(
             node=self,
             joint_names=[
                 "joint1",
@@ -31,25 +36,38 @@ class ShapesLoader(Node):
             group_name="xarm7"
         )
 
+        self.log("Waiting for MoveIt2 action server...")
+        self.moveit2.wait_until_ready()
+        self.log("MoveIt2 ready")
+
         self.poses = []
 
         self.load_shapes()
 
         self.plan_shapes()
 
+    def log(self, msg):
+        """统一日志格式"""
+        self.get_logger().info(f"[WW] {msg}")
+
     def load_shapes(self):
+
+        self.log("Loading shapes.yaml")
 
         package_path = get_package_share_directory('avatar_challenge')
         config_path = os.path.join(package_path, 'config', 'shapes.yaml')
 
         with open(config_path) as f:
             data = yaml.safe_load(f)
-        
+
         for s in data['shapes']:
 
             point_num = s['num']
 
-            self.poses = [Pose() for _ in range(point_num+1)]
+            self.log(f"Processing shape with {point_num} vertices")
+
+            # 初始化 pose list
+            poses_local = []
 
             # rotation
             q = quaternion_from_euler(
@@ -57,35 +75,61 @@ class ShapesLoader(Node):
                 s['start_pose']['rpy'][1],
                 s['start_pose']['rpy'][2]
             )
-            t = quaternion_matrix(q)
+
+            # transformation matrix
+            T = quaternion_matrix(q)
+
             # translation
-            t[0,3] = s['start_pose']['position'][0]
-            t[1,3] = s['start_pose']['position'][1]
-            t[2,3] = s['start_pose']['position'][2]
+            T[0, 3] = s['start_pose']['position'][0]
+            T[1, 3] = s['start_pose']['position'][1]
+            T[2, 3] = s['start_pose']['position'][2]
 
             for i in range(point_num + 1):
-                
+
                 msg = Pose()
-                
-                if i == 1 or i == point_num:
-                    t_world = t
+
+                # 起点和终点
+                if i == 0 or i == point_num:
+
+                    msg.position.x = T[0, 3]
+                    msg.position.y = T[1, 3]
+                    msg.position.z = T[2, 3]
+
                 else:
-                    p = np.array([s['vertices'][i][0], s['vertices'][i][0], 0, 1.0])
-                    t_world = t @ p
-                
-                msg.position.x =  t_world[0, 3]
-                msg.position.y =  t_world[1, 3]
-                msg.position.z =  t_world[2, 3]
 
-                msg.orientaion.x = q[0]
-                msg.orientaion.y = q[1]
-                msg.orientaion.z = q[2]
-                msg.orientaion.w = q[3]
+                    p = np.array([
+                        s['vertices'][i][0],
+                        s['vertices'][i][1],
+                        0,
+                        1.0
+                    ])
 
-                # self.publisher.publish(msg)
-                self.poses[i] = msg
+                    p_world = T @ p
 
-    def interpolation(self, p0, p1, steps = 50):
+                    msg.position.x = p_world[0]
+                    msg.position.y = p_world[1]
+                    msg.position.z = p_world[2]
+
+                msg.orientation.x = q[0]
+                msg.orientation.y = q[1]
+                msg.orientation.z = q[2]
+                msg.orientation.w = q[3]
+
+                poses_local.append(msg)
+
+                self.log(
+                    f"Pose {i}: "
+                    f"x={msg.position.x:.3f}, "
+                    f"y={msg.position.y:.3f}, "
+                    f"z={msg.position.z:.3f}"
+                )
+
+            # 保存
+            self.poses.extend(poses_local)
+
+        self.log(f"Total poses loaded: {len(self.poses)}")
+
+    def interpolation(self, p0, p1, steps=50):
 
         poses = []
 
@@ -110,27 +154,35 @@ class ShapesLoader(Node):
             pose.position.x = pos[0]
             pose.position.y = pos[1]
             pose.position.z = pos[2]
-            pose.orientaion = p0.orientaion
+
+            pose.orientation = copy.deepcopy(p0.orientation)
 
             poses.append(pose)
-        
+
         return poses
 
     def plan_shapes(self):
 
-        self.waypoints = []
+        self.log("Generating interpolated waypoints")
 
-        for i in range(len(self.poses)-1):
+        waypoints = []
+
+        for i in range(len(self.poses) - 1):
 
             p0 = self.poses[i]
-            p1 = self.poses[i+1]
+            p1 = self.poses[i + 1]
 
-            waypoints = self.interpolation(p0, p1)
+            segment = self.interpolation(p0, p1)
 
-            for p in waypoints:
-                self.waypoints.append(copy.deepcopy(p))
-        
-        self.movit2.move_to_pose_sequence(self.waypoints)
+            waypoints.extend(segment)
+
+        self.log(f"Total waypoints generated: {len(waypoints)}")
+
+        self.log("Sending trajectory to MoveIt2")
+
+        self.moveit2.move_to_pose_sequence(waypoints)
+
+        self.log("Trajectory command sent")
 
 
 def main():
@@ -141,10 +193,10 @@ def main():
 
     rclpy.spin(node)
 
+    node.destroy_node()
+
     rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()
-
-
-             
