@@ -58,10 +58,10 @@ class ShapesLoader(Node):
                 msg.position.y =  t_world[1, 3]
                 msg.position.z =  t_world[2, 3]
 
-                msg.orientation.x = q[0]
-                msg.orientation.y = q[1]
-                msg.orientation.z = q[2]
-                msg.orientation.w = q[3]
+                msg.orientaion.x = q[0]
+                msg.orientaion.y = q[1]
+                msg.orientaion.z = q[2]
+                msg.orientaion.w = q[3]
 
                 # self.publisher.publish(msg)
                 self.poses[i] = msg
@@ -91,7 +91,7 @@ class ShapesLoader(Node):
             pose.position.x = pos[0]
             pose.position.y = pos[1]
             pose.position.z = pos[2]
-            pose.orientation = p0.orientaion
+            pose.orientaion = p0.orientaion
 
             poses.append(pose)
         

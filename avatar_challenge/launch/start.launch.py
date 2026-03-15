@@ -24,7 +24,12 @@ def generate_launch_description():
             #######################
             # ADD YOUR NODES HERE #
             #######################
-
+            Node(
+                package='avatar_challenge',
+                executable='shape_loader',
+                name='shape_loader',
+                output='screen'
+            )
             
         ]
     )
