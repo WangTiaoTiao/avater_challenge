@@ -2,6 +2,7 @@ import rclpy
 import numpy as np
 import copy
 import os
+import time
 import yaml
 
 from rclpy.node import Node
@@ -36,10 +37,10 @@ class ShapesLoader(Node):
             group_name="xarm7"
         )
 
-        self.log("Waiting for MoveIt2 action server...")
-        self.moveit2.wait_until_ready()
+        self.log("Waiting for MoveIt2 system to be ready...")
+        time.sleep(2)
         self.log("MoveIt2 ready")
-
+        
         self.poses = []
 
         self.load_shapes()
@@ -176,13 +177,31 @@ class ShapesLoader(Node):
 
             waypoints.extend(segment)
 
-        self.log(f"Total waypoints generated: {len(waypoints)}")
+        for pose in waypoints:
 
-        self.log("Sending trajectory to MoveIt2")
+            self.log(
+                f"Moving to x={pose.position.x:.3f}, "
+                f"y={pose.position.y:.3f}, "
+                f"z={pose.position.z:.3f}"
+            )
 
-        self.moveit2.move_to_pose_sequence(waypoints)
+            self.moveit2.move_to_pose(
+                position=[
+                    pose.position.x,
+                    pose.position.y,
+                    pose.position.z
+                ],
+                quat_xyzw=[
+                    pose.orientation.x,
+                    pose.orientation.y,
+                    pose.orientation.z,
+                    pose.orientation.w
+                ],
+                cartesian=True
+            )
 
-        self.log("Trajectory command sent")
+            self.moveit2.wait_until_executed()
+
 
 
 def main():
