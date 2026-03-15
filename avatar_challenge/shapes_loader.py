@@ -5,7 +5,8 @@ from rclpy.node import Node
 from tf_transformations import quaternion_from_euler, quaternion_matrix
 import yaml
 from pymoveit2 import MoveIt2
-
+import os
+from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import Pose
 
 class ShapesLoader(Node):
@@ -38,7 +39,10 @@ class ShapesLoader(Node):
 
     def load_shapes(self):
 
-        with open('config/shapes.yaml') as f:
+        package_path = get_package_share_directory('avatar_challenge')
+        config_path = os.path.join(package_path, 'config', 'shapes.yaml')
+
+        with open(config_path) as f:
             data = yaml.safe_load(f)
         
         for s in data['shapes']:
