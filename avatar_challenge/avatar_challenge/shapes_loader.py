@@ -4,6 +4,7 @@ import copy
 from rclpy.node import Node
 from tf_transformation import quaternion_from_euler, quaternion_matrix
 import yaml
+from pymoveit2 import MoveIt2
 
 from geometry_msgs.msg import Pose
 
@@ -13,7 +14,21 @@ class ShapesLoader(Node):
 
         super().__init__('shape_loader')
 
-        self.movit2 = Pose
+        self.movit2 = self.moveit2 = MoveIt2(
+            node=self,
+            joint_names=[
+                "joint1",
+                "joint2",
+                "joint3",
+                "joint4",
+                "joint5",
+                "joint6",
+                "joint7"
+            ],
+            base_link_name="link_base",
+            end_effector_name="link_eef",
+            group_name="xarm7"
+        )
 
         self.poses = []
 
