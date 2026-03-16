@@ -8,6 +8,8 @@ import yaml
 from rclpy.node import Node
 from geometry_msgs.msg import Pose
 from tf_transformations import quaternion_from_euler, quaternion_matrix
+from visualization_msgs.msg import Marker
+from geometry_msgs.msg import Point
 from ament_index_python.packages import get_package_share_directory
 from pymoveit2 import MoveIt2
 
@@ -19,6 +21,13 @@ class ShapesLoader(Node):
         super().__init__('shape_loader')
 
         self.log("Shape Loader node started")
+
+
+        self.marker_pub = self.create_publisher(
+            Marker,
+            "trajectory_marker",
+            10
+        )
 
         # MoveIt2 interface
         self.moveit2 = MoveIt2(
@@ -50,6 +59,37 @@ class ShapesLoader(Node):
     def log(self, msg):
         """统一日志格式"""
         self.get_logger().info(f"[WW] {msg}")
+
+    def publish_trajectory(self, waypoints):
+
+        marker = Marker()
+
+        marker.header.frame_id = "link_eef"
+        marker.header.stamp = self.get_clock().now().to_msg()
+
+        marker.ns = "trajectory"
+        marker.id = 0
+
+        marker.type = Marker.LINE_STRIP
+        marker.action = Marker.ADD
+
+        marker.scale.x = 0.01
+
+        marker.color.r = 1.0
+        marker.color.g = 0.0
+        marker.color.b = 0.0
+        marker.color.a = 1.0
+
+        for pose in waypoints:
+
+            p = Point()
+            p.x = pose.position.x
+            p.y = pose.position.y
+            p.z = pose.position.z
+
+            marker.points.append(p)
+
+        self.marker_pub.publish(marker)
 
     def load_shapes(self):
 
@@ -200,6 +240,8 @@ class ShapesLoader(Node):
                 cartesian=True
             )
 
+            self.publish_trajectory(self.waypoints)
+            
             self.moveit2.wait_until_executed()
 
 
