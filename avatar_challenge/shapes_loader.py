@@ -60,11 +60,11 @@ class ShapesLoader(Node):
         """统一日志格式"""
         self.get_logger().info(f"[WW] {msg}")
 
-    def publish_trajectory(self, waypoints):
+    def publish_trajectory(self, pose):
 
         marker = Marker()
 
-        marker.header.frame_id = "link_eef"
+        marker.header.frame_id = "link_base"
         marker.header.stamp = self.get_clock().now().to_msg()
 
         marker.ns = "trajectory"
@@ -80,14 +80,12 @@ class ShapesLoader(Node):
         marker.color.b = 0.0
         marker.color.a = 1.0
 
-        for pose in waypoints:
+        p = Point() 
+        p.x = pose.position.x
+        p.y = pose.position.y 
+        p.z = pose.position.z
 
-            p = Point()
-            p.x = pose.position.x
-            p.y = pose.position.y
-            p.z = pose.position.z
-
-            marker.points.append(p)
+        marker.points.append(p)
 
         self.marker_pub.publish(marker)
 
@@ -240,7 +238,7 @@ class ShapesLoader(Node):
                 cartesian=True
             )
 
-            self.publish_trajectory(self.waypoints)
+            self.publish_trajectory(pose)
             
             self.moveit2.wait_until_executed()
 
