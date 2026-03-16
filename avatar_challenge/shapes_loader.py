@@ -22,6 +22,7 @@ class ShapesLoader(Node):
 
         self.log("Shape Loader node started")
 
+        self.traj_marker = []
 
         self.marker_pub = self.create_publisher(
             Marker,
@@ -62,6 +63,13 @@ class ShapesLoader(Node):
 
     def publish_trajectory(self, pose):
 
+        p = Point()
+        p.x = pose.position.x
+        p.y = pose.position.y
+        p.z = pose.position.z
+
+        self.traj_marker.append(p)
+
         marker = Marker()
 
         marker.header.frame_id = "link_base"
@@ -80,12 +88,7 @@ class ShapesLoader(Node):
         marker.color.b = 0.0
         marker.color.a = 1.0
 
-        p = Point() 
-        p.x = pose.position.x
-        p.y = pose.position.y 
-        p.z = pose.position.z
-
-        marker.points.append(p)
+        marker.points = self.traj_marker
 
         self.marker_pub.publish(marker)
 
